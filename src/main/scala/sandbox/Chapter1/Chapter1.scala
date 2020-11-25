@@ -144,8 +144,11 @@ object Chapter1 {
   //catsは型クラスごとに個別のimportを提供する。(たぶんcats.instances.int._みたいなやつだと思う
 
   //catsの全ての型クラスを一度にimport
-
   import cats._
+
+  //なにか.showすることができるようになる
+  import cats.syntax.show._
+
   //全ての標準型クラスインスタンスと全ての構文をimportしたい時は下記
   //import cats.implicits._
 
@@ -163,6 +166,73 @@ object Chapter1 {
   //exercise 1.4.6
   //Printableの代わりにShowを使用してCatアプリケーションを再実装
   implicit val catShow: Show[Cat] = Show.show(cat => "%s is a %d year-old %s cat.".format(cat.name, cat.age, cat.color))
+
+  //Eqについて
+  //List[Option[Int]]の中身を==1って比較することはできない。Option[Int] == 1となるため常にfalse
+  //println(List(1, 2, 3).map(Option(_)).filter(item => item == 1))
+  // warning: Option[Int] and Int are unrelated: they will most likely never compare equal
+  // res: List[Option[Int]] = List()
+  //これなら正しい。Eqならもっと楽に確認できる
+  //println(List(1, 2, 3).map(Option(_)).filter(item => item.contains(1)))
+
+  //Eqは下記のようにできている
+  //trait Eq[A]{
+  //  def eqv(a: A, b: A): Boolean
+  //}
+
+  //cat.syntax.eqで定義されているインターフェース構文はスコープ内にインスタンスEq[A]がある場合に同等性チェックを実行するためのメソッドを提供
+  //=== :等しいか
+  //=!= :等しくないか
+
+  import cats.Eq
+  import cats.instances.int._
+  val eqInt: Eq[Int] = Eq[Int]
+  // true
+  eqInt.eqv(123,123)
+  //false
+  eqInt.eqv(123,234)
+  //これだとコンパイルエラー
+  //eqInt.eqv(123,"234")
+
+  //cats.syntax.eqをimportして===, =!=を使えるようにすることもできる
+  import cats.syntax.eq._
+  123 === 123
+  123 =!= 234
+  //これだとコンパイルエラー
+  //123 === "123"
+
+  //Option[Int]の比較を行うにはIntとOptionをimportする必要がある
+  import cats.instances.int._
+  import cats.instances.option._
+  //下記だと型が完全に一致していないためエラーになる
+  //Some(1) === None
+  //型を明示的に教えてあげるとエラーにならない
+  (Some(1): Option[Int]) === (None: Option[Int])
+  //下記でもOK
+  Option(1) === Option.empty[Int]
+  //下記のように書くこともできる
+  import cats.syntax.option._
+  1.some === none[Int]
+  1.some =!= none[Int]
+
+  import cats.instances.long._
+  implicit val dateEq: Eq[Date] = Eq.instance[Date] {(date1, date2) =>
+    date1.getTime === date2.getTime
+  }
+  val x = new Date
+  val y = new Date
+  x === x
+  x === y
+
+  //Covariance: 共分散 [+A]のこと
+  sealed trait Shape
+  case class Circle(radius: Double) extends Shape
+  val circles: List[Circle] = List(Circle(10.0), Circle(11.0))
+  val shapes: List[Shape] = circles
+
+  //Contravariance: 共変性 [-A]のこと
+
+  //catsはinvariant typeを好む
 
   def main(args: Array[String]): Unit = {
     //personWriterを書いていなくてもtoJsonのimplicitでpersonWriter使っていることを見つけてimportかってにしてくれる。
@@ -210,6 +280,23 @@ object Chapter1 {
 
     //exercise1.4.6の出力
     println(cat.show)
+
+    //1.5.5 exercise
+    val catEq1: Cat = Cat("Garfield",   38, "orange and black")
+    val catEq2: Cat = Cat("Heathcliff", 33, "orange and black")
+    implicit val catEq: Eq[Cat] = Eq.instance[Cat] {(cat1, cat2) =>
+      cat1.age === cat2.age && cat1.color === cat2.color && cat1.name === cat2.name
+    }
+
+    println(catEq1 === catEq2)
+    println(catEq1 =!= catEq2)
+
+    val optionCat1: Option[Cat] = Option(catEq1)
+    val optionCat2: Option[Cat] = Option.empty
+
+    println(optionCat1 === optionCat2)
+    println(optionCat1 =!= optionCat2)
+
   }
 
 }
