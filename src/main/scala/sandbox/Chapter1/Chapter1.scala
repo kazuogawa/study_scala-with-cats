@@ -224,13 +224,13 @@ object Chapter1 {
   x === x
   x === y
 
-  //Covariance: 共分散 [+A]のこと
+  //Covariance: 共変 [+A]のこと
   sealed trait Shape
   case class Circle(radius: Double) extends Shape
   val circles: List[Circle] = List(Circle(10.0), Circle(11.0))
   val shapes: List[Shape] = circles
 
-  //Contravariance: 共変性 [-A]のこと
+  //Contravariance: 反変 [-A]のこと
 
   //catsはinvariant typeを好む
 
