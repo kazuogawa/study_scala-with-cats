@@ -658,9 +658,7 @@ object Chapter3 {
     def imap[B](dec: A => B, enc: B => A): Codec[B] = new Codec[B] {
       override def encode(value: B): String = self.encode(enc(value))
 
-      override def decode(value: String): B = self.decode(value)
-
-      )
+      override def decode(value: String): B = dec(self.decode(value))
     }
   }
 
@@ -817,29 +815,29 @@ object Chapter3 {
   * 左から右への除去が正しい選択ではない状況があります。 1つの例は、ScalacticのOrタイプです。これは、従来は左バイアスのいずれかと同等です。
   * https://www.scalactic.org/
   * */
-//  type PossibleResult = ActualResult Or Error
+  //  type PossibleResult = ActualResult Or Error
 
   /* もう1つの例は、Function1の共変ファンクターです。
   Function1の共変FunctorはandThenスタイルの左から右への関数合成を実装しますが、
   Contravariantファンクターはcomposeスタイルの右から左への合成を実装します。つまり、次の式はすべて同等です。*/
 
-//  val func3a: Int => Double =
-//    a => func2(func1(a))
-//
-//  val func3b: Int => Double =
-//    func2.compose(func1)
-//
-//  // Hypothetical example. This won't actually compile:
-//  val func3c: Int => Double =
-//    func2.contramap(func1)
+  //  val func3a: Int => Double =
+  //    a => func2(func1(a))
+  //
+  //  val func3b: Int => Double =
+  //    func2.compose(func1)
+  //
+  //  // Hypothetical example. This won't actually compile:
+  //  val func3c: Int => Double =
+  //    func2.contramap(func1)
 
   //ただし、これを実際に試してみると、コードはコンパイルされません。
-//  import cats.syntax.contravariant._ // for contramap
-//
-//  val func3c = func2.contramap(func1)
-//  // error: value contramap is not a member of Double => Double
-//  // val func3c = func2.contramap(func1)
-//  //
+  //  import cats.syntax.contravariant._ // for contramap
+  //
+  //  val func3c = func2.contramap(func1)
+  //  // error: value contramap is not a member of Double => Double
+  //  // val func3c = func2.contramap(func1)
+  //  //
 
   /* ここでの問題は、Function1のContravariantが戻り値の型を修正し、パラメーター型を変化させたままにすることです。
   * コンパイラは、単に左から右へのバイアスのために失敗します。
@@ -852,9 +850,9 @@ object Chapter3 {
 
   /* <=のインスタンスとしてfunc2を再入力すると、必要な削除順序がリセットされ、必要に応じてコントラマップを呼び出すことができます。 */
 
-//  val func2b: Double <= Double = func2
-//
-//  val func3c = func2b.contramap(func1)
+  //  val func2b: Double <= Double = func2
+  //
+  //  val func3c = func2b.contramap(func1)
 
   /* func2とfunc2bの違いは純粋に構文上のものです。
   どちらも同じ値を参照し、それ以外の場合はタイプエイリアスは完全に互換性があります。
