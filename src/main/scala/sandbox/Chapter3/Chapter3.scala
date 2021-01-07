@@ -539,14 +539,14 @@ object Chapter3 {
         if (value) "yes" else "no"
     }
 
-  import sandbox.Chapter3.Chapter3.stringPrintable.format
-
-  format("hello")
-  // res2: String = "'hello'"
-
-  import sandbox.Chapter3.Chapter3.booleanPrintable.format
-
-  format(true)
+  //  import sandbox.Chapter3.Chapter3.stringPrintable.format
+  //
+  //  format("hello")
+  //  // res2: String = "'hello'"
+  //
+  //  import sandbox.Chapter3.Chapter3.booleanPrintable.format
+  //
+  //  format(true)
 
   // res3: String = "yes"
 
@@ -554,7 +554,7 @@ object Chapter3 {
   セクション1.2.3で説明されているように、これを暗黙のdefとして記述する必要があります。
   * */
 
-  final case class Box[A](value: A)
+  //  final case class Box[A](value: A)
 
   /*
   * 完全な定義を最初から書き出すのではなく（new Printable [Box]など）、
@@ -579,15 +579,15 @@ object Chapter3 {
   /* すべてのタイプのBoxでインスタンスを汎用にするために、Box内のタイプのPrintableに基づいています。
   完全な定義を手作業で書き出すことができます。(確かに) */
 
-  implicit def boxPrintable[A](implicit p: Printable[A]): Printable[Box[A]] =
-    new Printable[Box[A]] {
-      def format(box: Box[A]): String =
-        p.format(box.value)
-    }
-
-  /* または、contramapを使用して、暗黙のパラメーターに基づいて新しいインスタンスを作成します。*/
-  implicit def boxPrintable[A](implicit p: Printable[A]): Printable[Box[A]] =
-    p.contramap[Box[A]](_.value)
+  //  implicit def boxPrintable[A](implicit p: Printable[A]): Printable[Box[A]] =
+  //    new Printable[Box[A]] {
+  //      def format(box: Box[A]): String =
+  //        p.format(box.value)
+  //    }
+  //
+  //  /* または、contramapを使用して、暗黙のパラメーターに基づいて新しいインスタンスを作成します。*/
+  //  implicit def boxPrintable[A](implicit p: Printable[A]): Printable[Box[A]] =
+  //    p.contramap[Box[A]](_.value)
 
   /* コントラマップの使用ははるかに簡単であり、純粋関数型コンビネータを使用して単純なビルディングブロックを組み合わせることにより、
     ソリューションを構築する関数型プログラミングアプローチを伝えます。
