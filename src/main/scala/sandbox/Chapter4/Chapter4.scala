@@ -434,6 +434,266 @@ object Chapter4 {
   * したがって、このセクションの冒頭でsumSquareを呼び出す際に、IntをId [Int]として再入力する必要があります。
   * */
 
+  /* 4.4 Either
+  * もう1つの便利なモナドを見てみましょう。Scala標準ライブラリのEitherタイプです。
+  * Scala 2.11以前では、mapメソッドとflatMapメソッドがなかったため、多くの人がどちらのモナドも考慮していませんでした。
+  * ただし、Scala 2.12では、どちらかが右バイアスになりました。
+  *
+  * 4.4.1 Left and Right Bias
+  * Scala 2.11では、デフォルトのマップまたはflatMapメソッドがありませんでした。
+  * これにより、Scala 2.11バージョンのEitherは、理解のために使用するのに不便になりました。
+  * すべてのジェネレーター句に.rightへの呼び出しを挿入する必要がありました。
+  *
+  * */
+
+  val either1: Either[String, Int] = Right(10)
+  val either2: Either[String, Int] = Right(32)
+
+  for {
+    a <- either1.right
+    b <- either2.right
+  } yield a + b
+
+  /*
+  * Scala 2.12では、Eitherが再設計されました。
+  * 現代のEitherは、右側が成功事例を表すと判断し、mapとflatMapを直接サポートします。
+  * これにより、理解がはるかに快適になります。
+  * */
+
+  for {
+    a <- either1
+    b <- either2
+  } yield a + b
+
+  /*
+  * Catsは、cats.syntax.etherインポートを介してこの動作をScala 2.11にバックポートし、
+  * サポートされているすべてのバージョンのScalaで右バイアスのEitherを使用できるようにします。
+  * Scala 2.12+では、このインポートを省略するか、何も壊さずにそのままにしておくことができます。
+  * */
+
+  import cats.syntax.either._ // for map and flatMap
+
+  for {
+    a <- either1
+    b <- either2
+  } yield a + b
+
+  /* 4.4.2 Creating Instances
+  * LeftとRightのインスタンスを直接作成することに加えて、
+  * cats.syntax.etherからasLeftおよびasRight拡張メソッドをインポートすることもできます。
+  * */
+
+  import cats.syntax.either._ // for asRight
+
+  val a = 3.asRight[String]
+  // a: Either[String, Int] = Right(3)
+  val b = 4.asRight[String]
+  // b: Either[String, Int] = Right(4)
+
+  for {
+    x <- a
+    y <- b
+  } yield x * x + y * y
+
+  /*
+  * これらの「スマートコンストラクター」は、LeftとRightではなくEitherタイプの結果を返すため、
+  * Left.applyやRight.applyよりも優れています。
+  * これは、以下の例の問題のように、絞り込みすぎによって引き起こされる型推論の問題を回避するのに役立ちます。
+  * */
+
+  //  def countPositive(nums: List[Int]) =
+  //    nums.foldLeft(Right(0)) { (accumulator, num) =>
+  //      if(num > 0) {
+  //        accumulator.map(_ + 1)
+  //      } else {
+  //        Left("Negative. Stopping!")
+  //      }
+  //    }
+  // error: type mismatch;
+  //  found   : scala.util.Either[Nothing,Int]
+  //  required: scala.util.Right[Nothing,Int]
+  //       accumulator.map(_ + 1)
+  //       ^^^^^^^^^^^^^^^^^^^^^^
+  // error: type mismatch;
+  //  found   : scala.util.Left[String,Nothing]
+  //  required: scala.util.Right[Nothing,Int]
+  //       Left("Negative. Stopping!")
+  //       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  /*
+  * このコードは、次の2つの理由でコンパイルに失敗します。
+  * 1.コンパイラは、アキュムレータのタイプをどちらかではなく右として推測します。
+  * 2. Right.applyの型パラメーターを指定しなかったため、コンパイラーは左側のパラメーターをNothingとして推測します。
+  * asRightに切り替えると、これらの問題の両方を回避できます。
+  * asRightの戻り値の型はEitherであり、1つの型パラメーターのみで型を完全に指定できます。
+  * (めっちゃ便利じゃん！)
+  * */
+
+  def countPositive(nums: List[Int]) =
+    nums.foldLeft(0.asRight[String]) { (accumulator, num) =>
+      if (num > 0) {
+        accumulator.map(_ + 1)
+      } else {
+        Left("Negative. Stopping!")
+      }
+    }
+
+  countPositive(List(1, 2, 3))
+  // res5: Either[String, Int] = Right(3)
+  countPositive(List(1, -2, 3))
+  // res6: Either[String, Int] = Left("Negative. Stopping!")
+
+  /*
+  * cats.syntax.etherは、Eitherコンパニオンオブジェクトにいくつかの便利な拡張メソッドを追加します。
+  * catchOnlyメソッドとcatchNonFatalメソッドは、次のいずれかのインスタンスとして例外をキャプチャするのに最適です。
+  * */
+
+  Either.catchOnly[NumberFormatException]("foo".toInt)
+  // res7: Either[NumberFormatException, Int] = Left(
+  //   java.lang.NumberFormatException: For input string: "foo"
+  // )
+  Either.catchNonFatal(sys.error("Badness"))
+  // res8: Either[Throwable, Nothing] = Left(java.lang.RuntimeException: Badness)
+
+  //他のデータ型からEitherを作成する方法もあります。(これ便利だなー
+  Either.fromTry(scala.util.Try("foo".toInt))
+  // res9: Either[Throwable, Int] = Left(
+  //   java.lang.NumberFormatException: For input string: "foo"
+  // )
+  Either.fromOption[String, Int](None, "Badness")
+  // res10: Either[String, Int] = Left("Badness")
+
+  /* 4.4.3 Transforming Eithers
+  * cats.syntax.etherは、Eitherのインスタンスに役立つメソッドもいくつか追加します。
+  * Scala 2.11または2.12のユーザーは、orElseおよびgetOrElseを使用して、右側から値を抽出するか、デフォルトを返すことができます。
+  * (すごいおもしろい)
+  * */
+
+  import cats.syntax.either._
+
+  "Error".asLeft[Int].getOrElse(0)
+  // res11: Int = 0
+  "Error".asLeft[Int].orElse(2.asRight[String])
+  // res12: Either[String, Int] = Right(2)
+
+  /* sureメソッドを使用すると、右側の値が述語を満たしているかどうかを確認できます。 */
+  (-1).asRight[String].ensure("Must be non-negative!")(_ > 0)
+  // res13: Either[String, Int] = Left("Must be non-negative!")
+
+  /* RecoverメソッドとrecoverWithメソッドは、Futureの同名のメソッドと同様のエラー処理を提供します。 */
+
+  "error".asLeft[Int].recover {
+    case _: String => -1
+  }
+  // res14: Either[String, Int] = Right(-1)
+
+  "error".asLeft[Int].recoverWith {
+    case _: String => Right(-1)
+  }
+  // res15: Either[String, Int] = Right(-1)
+
+  //mapを補完するleftMapメソッドとbimapメソッドがあります。(flatMapでいいかんじにできるわけではないのか...)
+
+  "foo".asLeft[Int].leftMap(_.reverse)
+  // res16: Either[String, Int] = Left("oof")
+  6.asRight[String].bimap(_.reverse, _ * 7)
+  // res17: Either[String, Int] = Right(42)
+  "bar".asLeft[Int].bimap(_.reverse, _ * 7)
+  // res18: Either[String, Int] = Left("rab")
+
+  //swapメソッドを使用すると、左から右に交換できます。
+
+  123.asRight[String]
+  // res19: Either[String, Int] = Right(123)
+  123.asRight[String].swap
+  // res20: Either[Int, String] = Left(123)
+
+  //最後に、Catsは、toOption、toList、toTry、toValidatedなどの多数の変換メソッドを追加します。
+
+  /*
+  * 4.4.4 Error Handling
+  * どちらも通常、フェイルファストエラー処理を実装するために使用されます。
+  * 通常どおり、flatMapを使用して計算をシーケンスします。 1つの計算が失敗した場合、残りの計算は実行されません。
+  * */
+
+  for {
+    a <- 1.asRight[String]
+    b <- 0.asRight[String]
+    c <- if (b == 0) "DIV0".asLeft[Int]
+    else (a / b).asRight[String]
+  } yield c * 100
+  // res21: Either[String, Int] = Left("DIV0")
+
+  //エラー処理にEitherを使用する場合、エラーを表すために使用するタイプを決定する必要があります。 これにはThrowableを使用できます。
+
+  type Result[A] = Either[Throwable, A]
+
+  /*
+  * これにより、scala.util.Tryと同様のセマンティクスが得られます。
+  * ただし、問題は、Throwableが非常に幅広いタイプであるということです。
+  * どのタイプのエラーが発生したかについては（ほとんど）わかりません。
+  * 別のアプローチは、プログラムで発生する可能性のあるエラーを表す代数的データ型を定義することです。
+  * */
+
+  //TODO: ProductとSerializableが何かわからない。質問する
+  sealed trait LoginError extends Product with Serializable
+
+  final case class UserNotFound(username: String)
+    extends LoginError
+
+  final case class PasswordIncorrect(username: String)
+    extends LoginError
+
+  case object UnexpectedError extends LoginError
+
+  case class User(username: String, password: String)
+
+  type LoginResult = Either[LoginError, User]
+
+  /*
+  * このアプローチは、Throwableで見た問題を解決します。
+  * これにより、予想されるエラータイプの固定セットと、予想外のその他のすべてのキャッチオールが提供されます。
+  * また、私たちが行うパターンマッチングの網羅性チェックの安全性も得られます。
+  * */
+
+  // Choose error-handling behaviour based on type:
+  def handleError(error: LoginError): Unit =
+    error match {
+      case UserNotFound(u) =>
+        println(s"User not found: $u")
+
+      case PasswordIncorrect(u) =>
+        println(s"Password incorrect: $u")
+
+      case UnexpectedError =>
+        println(s"Unexpected error")
+    }
+
+  val result1: LoginResult = User("dave", "passw0rd").asRight
+  // result1: LoginResult = Right(User("dave", "passw0rd"))
+  val result2: LoginResult = UserNotFound("dave").asLeft
+  // result2: LoginResult = Left(UserNotFound("dave"))
+
+  result1.fold(handleError, println)
+  // User(dave,passw0rd)
+  result2.fold(handleError, println)
+  // User not found: dave
+
+  /* 4.4.5 Exercise: What is Best?
+  * 前の例のエラー処理戦略は、すべての目的に適していますか？ エラー処理に他にどのような機能が必要ですか？
+  * */
+
+  //loginできました的なprintlnが必要？
+
+  /*
+  * これは未解決の質問です。 これは一種のトリック質問でもあります。答えは、探しているセマンティクスによって異なります。 熟考するいくつかのポイント：
+  * - 大規模なジョブを処理する場合、エラー回復は重要です。 1日間ジョブを実行した後、最後の要素で失敗したことを確認したくありません。
+  * - エラー報告も同様に重要です。 何かがうまくいかなかったというだけでなく、何がうまくいかなかったのかを知る必要があります。
+  * - 多くの場合、最初に発生したエラーだけでなく、すべてのエラーを収集する必要があります。 典型的な例は、Webフォームの検証です。
+  *   ユーザーがフォームを送信するときにすべてのエラーを報告する方が、一度に1つずつ報告するよりもはるかに優れたエクスペリエンスです。
+  *   (セキュリティ上それはどうなのか？クラッカーに何が間違っているかを教えるのは問題なのでは？)
+  * */
+
   def main(args: Array[String]): Unit = {
     println(parseInt("abc"))
     println(parseInt("123"))
