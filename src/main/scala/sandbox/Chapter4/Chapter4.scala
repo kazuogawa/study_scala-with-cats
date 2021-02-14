@@ -677,6 +677,7 @@ object Chapter4 {
   result1.fold(handleError, println)
   // User(dave,passw0rd)
   result2.fold(handleError, println)
+
   // User not found: dave
 
   /* 4.4.5 Exercise: What is Best?
@@ -693,6 +694,122 @@ object Chapter4 {
   *   ユーザーがフォームを送信するときにすべてのエラーを報告する方が、一度に1つずつ報告するよりもはるかに優れたエクスペリエンスです。
   *   (セキュリティ上それはどうなのか？クラッカーに何が間違っているかを教えるのは問題なのでは？)
   * */
+
+  /* 4.5 Aside: Error Handling and MonadError
+  * Catsは、エラー処理に使用されるEitherのようなデータ型を抽象化するMonadErrorと呼ばれる追加の型クラスを提供します。
+  * MonadErrorは、エラーを発生させて処理するための追加の操作を提供します。
+  *
+  * このセクションはオプションです！
+  * エラー処理モナドを抽象化する必要がない限り、MonadErrorを使用する必要はありません。
+  * たとえば、MonadErrorを使用して、FutureとTry、またはEitherとEitherT（第5章で説明します）を抽象化できます。
+  * この種の抽象化が今必要ない場合は、セクション4.6に進んでください。
+  * 4.5.1 The MonadError Type Class
+  * MonadErrorの定義の簡略版を次に示します。
+  * * */
+
+  //  trait MonadError[F[_], E] extends Monad[F] {
+  //    //エラーを `F`コンテキストに持ち上げます。
+  //    def raiseError[A](e: E): F[A]
+  //
+  //    //エラーを処理し、エラーから回復する可能性があります。
+  //    def handleErrorWith[A](fa: F[A])(f: E => F[A]): F[A]
+  //
+  //    // すべてのエラーを処理し、それらから回復します。
+  //    def handleError[A](fa: F[A])(f: E => A): F[A]
+  //
+  //    //`F`のインスタンスをテストします。
+  //    // 述語が満たされない場合は失敗します：
+  //    def ensure[A](fa: F[A])(e: E)(f: A => Boolean): F[A]
+  //  }
+
+  /*
+  * MonadErrorは、次の2つのタイプパラメータで定義されます。
+  * - Fはモナドのタイプです。
+  * - Eは、Fに含まれるエラーのタイプです。
+  * これらのパラメータがどのように組み合わされるかを示すために、Eitherの型クラスをインスタンス化する例を次に示します。
+  * */
+
+  import cats.MonadError
+  import cats.instances.either._ // for MonadError
+
+  type ErrorOr[A] = Either[String, A]
+
+  val monadError: MonadError[ErrorOr, String] = MonadError[ErrorOr, String]
+
+  /*
+  * ApplicativeError 実際には、MonadErrorはApplicativeErrorと呼ばれる別の型クラスを拡張します。
+  * ただし、Applicativeは第6章まで出会うことはありません。
+  * セマンティクスは各型クラスで同じであるため、ここではこの詳細を無視できます。
+  *
+  * 4.5.2 Raising and Handling Errors
+  * MonadErrorの2つの最も重要なメソッドは、raiseErrorとhandleErrorWithです。
+  * raiseErrorは、失敗を表すインスタンスを作成することを除いて、Monadの純粋メソッドに似ています。
+  * */
+
+  val success: ErrorOr[Int] = monadError.pure(42)
+  // success: ErrorOr[Int] = Right(42)
+  val failure: ErrorOr[Nothing] = monadError.raiseError("Badness")
+  // failure: ErrorOr[Nothing] = Left("Badness")
+
+  /*
+  * handleErrorWithは、raiseErrorを補完するものです。
+  * これにより、Futureのrecoverメソッドと同様に、エラーを消費し、（おそらく）成功に変えることができます。
+  * */
+
+  monadError.handleErrorWith(failure) {
+    case "Badness" =>
+      monadError.pure("It's ok")
+
+    case _ =>
+      monadError.raiseError("It's not ok")
+  }
+  // res0: ErrorOr[String] = Right("It's ok")
+
+  // 考えられるすべてのエラーを処理できることがわかっている場合は、handleWithを使用できます。
+
+  //  monadError.handleError(failure) {
+  //    case "Badness" => 42
+  //
+  //    case _ => -1
+  //  }
+  //
+  /*
+  * フィルタのような動作を実装するensureと呼ばれる別の便利な方法があります。
+  * 成功したモナドの値を述語でテストし、述語がfalseを返した場合に発生するエラーを指定します。
+  * */
+
+  monadError.ensure(success)("Number too low!")(_ > 1000)
+
+  /*
+  * Catsは、cats.syntax.applicativeErrorを介してraiseErrorおよびhandleErrorWithの構文を提供し
+  * cats.syntax.monadErrorを介して確認します。
+  * */
+
+  //  import cats.syntax.applicative._ // for pure
+  //  import cats.syntax.applicativeError._ // for raiseError etc
+  //  import cats.syntax.monadError._ // for ensure
+  //
+  //  val success = 42.pure[ErrorOr]
+  //  // success: ErrorOr[Int] = Right(42)
+  //  val failure = "Badness".raiseError[ErrorOr, Int]
+  //  // failure: ErrorOr[Int] = Left("Badness")
+  //  failure.handleErrorWith {
+  //    case "Badness" =>
+  //      256.pure
+  //
+  //    case _ =>
+  //      ("It's not ok").raiseError
+  //  }
+  //  // res4: ErrorOr[Int] = Right(256)
+  //  success.ensure("Number to low!")(_ > 1000)
+  //  // res5: ErrorOr[Int] = Left("Number to low!")
+
+  /*
+  * これらのメソッドには他にも便利なバリエーションがあります。
+  * 詳細については、cats.MonadErrorおよびcats.ApplicativeErrorのソースを参照してください。
+  *
+  * */
+
 
   def main(args: Array[String]): Unit = {
     println(parseInt("abc"))
